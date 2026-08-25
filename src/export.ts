@@ -60,7 +60,7 @@ const safeCsv = (value: string | number) => `"${String(value).replaceAll('"', '"
 export function buildCsvBlob(data: ExportData, t: Dict): Blob {
   const { header, lines, summary } = buildTable(data, t);
   const csv = [header, ...lines, summary].map((row) => row.map(safeCsv).join(",")).join("\n");
-  return new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
+  return new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
 }
 
 export function buildXlsxBlob(data: ExportData, t: Dict): Blob {
