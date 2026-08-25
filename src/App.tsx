@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
-  AlertCircle, BarChart3, Check, ChevronDown, Download, FileSpreadsheet,
+  AlertCircle, BarChart3, Check, ChevronDown, Coffee, Download, FileSpreadsheet,
   FileText, Files, Info, Loader2, LockKeyhole, Moon, RotateCcw, Settings2, Sparkles,
   Sun, Trash2, UploadCloud, X,
 } from "lucide-react";
@@ -11,6 +11,7 @@ import { runExport, type ExportData, type ExportFormat } from "./export";
 
 const GITHUB_URL = "https://github.com/GSimas/Tokenlab";
 const AUTHOR_URL = "https://gustavosimas.com";
+const COFFEE_URL = "https://link.mercadopago.com.br/strangerhits";
 
 function GithubMark({ size = 17 }: { size?: number }) {
   return (
@@ -442,6 +443,11 @@ export default function App() {
         </div>
         <span>{t.footerFilesNote}</span>
       </footer>
+
+      <a className="coffee-fab" href={COFFEE_URL} target="_blank" rel="noopener noreferrer" aria-label={t.coffeeLabel} title={t.coffeeLabel}>
+        <span className="coffee-fab-icon"><Coffee size={22} /></span>
+        <span className="coffee-fab-text">{t.coffeeLabel}</span>
+      </a>
     </main>
   );
 }

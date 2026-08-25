@@ -140,6 +140,7 @@ const dict = {
     pdfSummaryTokens: "Tokens de entrada: {value}",
     pdfSummaryChunks: "Chunks gerados: {value}",
     pdfSummaryAvg: "Média de tokens por chunk: {value}",
+    coffeeLabel: "Pague-me um café",
   },
   en: {
     localProcessing: "Local browser processing",
@@ -239,6 +240,7 @@ const dict = {
     pdfSummaryTokens: "Input tokens: {value}",
     pdfSummaryChunks: "Chunks generated: {value}",
     pdfSummaryAvg: "Average tokens per chunk: {value}",
+    coffeeLabel: "Buy me a coffee",
   },
 } as const;
 

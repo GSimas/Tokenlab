@@ -338,6 +338,49 @@ footer > span:last-child { text-align: right; font-family: var(--font-technical)
 @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.coffee-fab {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  height: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  border-radius: 999px;
+  background: var(--brand-green);
+  color: var(--dark-bg);
+  text-decoration: none;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  animation: coffee-glow 2.6s ease-in-out infinite;
+  transition: max-width var(--motion-medium) var(--motion-easing), transform var(--motion-fast) var(--motion-easing), box-shadow var(--motion-fast) var(--motion-easing);
+}
+.coffee-fab:hover, .coffee-fab:focus-visible {
+  max-width: 240px;
+  transform: translateY(-3px);
+}
+.coffee-fab-icon { width: 56px; height: 56px; flex: 0 0 56px; display: grid; place-items: center; }
+.coffee-fab-text {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font: 700 12px/1 var(--font-technical);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-right: 0;
+  transition: max-width var(--motion-medium) var(--motion-easing), padding-right var(--motion-medium) var(--motion-easing);
+}
+.coffee-fab:hover .coffee-fab-text, .coffee-fab:focus-visible .coffee-fab-text {
+  max-width: 180px;
+  padding-right: 20px;
+}
+@keyframes coffee-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-green) 55%, transparent), 0 6px 24px rgba(0, 0, 0, 0.28); }
+  50% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--brand-green) 0%, transparent), 0 6px 24px rgba(0, 0, 0, 0.28); }
+}
+
 @media (max-width: 980px) {
   .topbar { grid-template-columns: 1fr auto; }
   .header-note { display: none; }
@@ -376,6 +419,9 @@ footer > span:last-child { text-align: right; font-family: var(--font-technical)
   .bar-row { grid-template-columns: 85px minmax(60px, 1fr) 45px; gap: 8px; }
   .distribution-panel, .insight-panel { padding: 20px; }
   .panel-title-row { flex-direction: column; }
+  .coffee-fab { left: 16px; bottom: 16px; height: 50px; min-width: 50px; max-width: 50px; }
+  .coffee-fab-icon { width: 50px; height: 50px; flex-basis: 50px; }
+  .coffee-fab:hover, .coffee-fab:focus-visible { max-width: 200px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
