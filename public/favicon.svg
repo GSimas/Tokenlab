@@ -1,5 +1,11 @@
-<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-<rect width="32" height="32" fill="#090D0A"/>
-<circle cx="16" cy="16" r="7" fill="none" stroke="#A8E935" stroke-width="2.4"/>
-<path d="M16 9 V4" stroke="#A8E935" stroke-width="2.4" stroke-linecap="round"/>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="7" fill="#090D0A"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" stroke="#A8E935" stroke-opacity="0.35"/>
+  <!-- Left token bracket -->
+  <path d="M10 9H8C6.89543 9 6 9.89543 6 11V21C6 22.1046 6.89543 23 8 23H10" stroke="#A8E935" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right token bracket -->
+  <path d="M22 9H24C25.1046 9 26 9.89543 26 11V21C26 22.1046 25.1046 23 24 23H22" stroke="#A8E935" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Central split / spark element -->
+  <circle cx="16" cy="16" r="3.2" fill="#A8E935"/>
+  <path d="M16 8.5V11M16 21V23.5M8.5 16H11M21 16H23.5" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
 </svg>

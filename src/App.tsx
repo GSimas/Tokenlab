@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
-  AlertCircle, BarChart3, Check, ChevronDown, Coffee, Download, FileSpreadsheet,
-  FileText, Files, Info, Loader2, LockKeyhole, Moon, RotateCcw, Settings2, Sparkles,
-  Sun, Trash2, UploadCloud, X,
+  AlertCircle, ArrowRight, BarChart3, BookOpen, Check, ChevronDown, Coffee, Cpu, Download,
+  FileSpreadsheet, FileText, Files, Info, Layers, Loader2, LockKeyhole, Moon,
+  Network, RotateCcw, Settings2, Sparkles, Split, Sun, Trash2, UploadCloud, X,
 } from "lucide-react";
 import { countTokens as countCl100k } from "gpt-tokenizer/encoding/cl100k_base";
 import * as XLSX from "xlsx";
 import { detectLocale, fmt, getDict, getSystemDarkServerSnapshot, getSystemDarkSnapshot, modelDetail, subscribeSystemDark, type Locale } from "./i18n";
 import { runExport, type ExportData, type ExportFormat } from "./export";
 
+const SCIENTATA_URL = "https://scientata.com";
 const GITHUB_URL = "https://github.com/GSimas/Tokenlab";
-const AUTHOR_URL = "https://gustavosimas.com";
 const COFFEE_URL = "https://link.mercadopago.com.br/strangerhits";
 
 function GithubMark({ size = 17 }: { size?: number }) {
@@ -328,9 +328,33 @@ export default function App() {
   return (
     <main>
       <header className="topbar">
-        <a className="brand" href="#workspace" aria-label="TokenLab"><span className="brand-mark"><span /></span><span>Token<span>Lab</span></span></a>
+        <a className="brand" href="#workspace" aria-label="TokenLab">
+          <span className="brand-mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M7 6H5C3.89543 6 3 6.89543 3 8V16C3 17.1046 3.89543 18 5 18H7" stroke="var(--brand-green)" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M17 6H19C20.1046 6 21 6.89543 21 8V16C21 17.1046 20.1046 18 19 18H17" stroke="var(--brand-green)" strokeWidth="2.5" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="3.2" fill="var(--brand-green)" />
+              <path d="M12 4.5V7M12 17V19.5M4.5 12H7M17 12H19.5" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </span>
+          <div className="brand-text">
+            <span className="brand-title">Token<span>Lab</span></span>
+            <span className="brand-subtitle">{t.scientataSubtitle}</span>
+          </div>
+        </a>
         <div className="header-note"><LockKeyhole size={14} /><span>{t.localProcessing}</span></div>
         <div className="header-actions">
+          <a
+            className="spark-button"
+            href={SCIENTATA_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t.scientataTooltip}
+            title={t.scientataTooltip}
+          >
+            <span className="spark-button-icon"><Sparkles size={16} /></span>
+            <span className="spark-button-text">Scientata</span>
+          </a>
           <a className="icon-button" href={GITHUB_URL} target="_blank" rel="noopener noreferrer" aria-label={t.githubLabel} title={t.githubLabel}><GithubMark size={17} /></a>
           <button className="locale-button" onClick={toggleLocale} aria-label={t.localeToggle} title={t.localeToggle}>{locale === "pt" ? "EN" : "PT"}</button>
           <button className="icon-button" onClick={toggleTheme} aria-label={t.themeToggle} title={t.themeToggle}>{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
@@ -435,11 +459,124 @@ export default function App() {
         {analysis.rows.length > 0 && <div className="source-table-wrap"><table><thead><tr><th>{t.tableSource}</th><th>{t.tableFormat}</th><th>{t.tableTokens}</th><th>{t.tableWords}</th><th>{t.tableChunks}</th><th>{t.tableAvgChunk}</th></tr></thead><tbody>{analysis.rows.map((row) => <tr key={`table-${row.id}`}><td><span className="source-name">{row.name}</span><small>{formatBytes(row.size, t.pastedText)}</small></td><td><span className="format-tag">{row.extension}</span></td><td>{num(row.tokens)}</td><td>{num(row.words)}</td><td>{num(row.chunks)}</td><td>{num(row.chunks ? row.chunkTotal / row.chunks : 0)}</td></tr>)}</tbody></table></div>}
       </section>
 
+      {/* Educational Guide Section */}
+      <section className="learn-section" id="learn-more">
+        <div className="learn-header">
+          <span className="eyebrow">{t.learnEyebrow}</span>
+          <h2>{t.learnTitle}</h2>
+          <p>{t.learnSubtitle}</p>
+        </div>
+
+        {/* Ingestion Pipeline */}
+        <div className="pipeline-card">
+          <div className="pipeline-title">
+            <Cpu size={19} />
+            <h3>{t.learnPipelineTitle}</h3>
+          </div>
+          <div className="pipeline-steps">
+            <div className="pipeline-step">
+              <div className="step-badge">01</div>
+              <strong>{t.learnStep1}</strong>
+              <p>{t.learnStep1Desc}</p>
+            </div>
+            <div className="pipeline-divider" aria-hidden="true"><ArrowRight size={18} /></div>
+            <div className="pipeline-step">
+              <div className="step-badge">02</div>
+              <strong>{t.learnStep2}</strong>
+              <p>{t.learnStep2Desc}</p>
+            </div>
+            <div className="pipeline-divider" aria-hidden="true"><ArrowRight size={18} /></div>
+            <div className="pipeline-step">
+              <div className="step-badge">03</div>
+              <strong>{t.learnStep3}</strong>
+              <p>{t.learnStep3Desc}</p>
+            </div>
+            <div className="pipeline-divider" aria-hidden="true"><ArrowRight size={18} /></div>
+            <div className="pipeline-step">
+              <div className="step-badge">04</div>
+              <strong>{t.learnStep4}</strong>
+              <p>{t.learnStep4Desc}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 Core Concept Cards */}
+        <div className="learn-grid">
+          <article className="learn-card">
+            <div className="learn-card-header">
+              <span className="learn-icon"><Layers size={20} /></span>
+              <span className="learn-tag">{t.learnConcept1Tag}</span>
+            </div>
+            <h3>{t.learnConcept1Title}</h3>
+            <p>{t.learnConcept1Body}</p>
+            <div className="visual-code-preview">
+              <code>"Base de conhecimento" → [0.038, -0.192, 0.441, ..., 0.082]</code>
+            </div>
+          </article>
+
+          <article className="learn-card">
+            <div className="learn-card-header">
+              <span className="learn-icon"><Split size={20} /></span>
+              <span className="learn-tag">{t.learnConcept2Tag}</span>
+            </div>
+            <h3>{t.learnConcept2Title}</h3>
+            <p>{t.learnConcept2Body}</p>
+            <div className="visual-split-preview">
+              <div className="chunk-preview-row">
+                <span className="chunk-box chunk-a">Chunk #1 ({chunkSize} tokens)</span>
+                <span className="chunk-overlap-indicator">Overlap ({overlap} tokens)</span>
+                <span className="chunk-box chunk-b">Chunk #2 ({chunkSize} tokens)</span>
+              </div>
+            </div>
+          </article>
+
+          <article className="learn-card">
+            <div className="learn-card-header">
+              <span className="learn-icon"><BookOpen size={20} /></span>
+              <span className="learn-tag">{t.learnConcept3Tag}</span>
+            </div>
+            <h3>{t.learnConcept3Title}</h3>
+            <p>{t.learnConcept3Body}</p>
+            <ul className="learn-list">
+              <li><strong>{t.learnStratRecursive.split(":")[0]}:</strong>{t.learnStratRecursive.slice(t.learnStratRecursive.indexOf(":") + 1)}</li>
+              <li><strong>{t.learnStratParagraph.split(":")[0]}:</strong>{t.learnStratParagraph.slice(t.learnStratParagraph.indexOf(":") + 1)}</li>
+              <li><strong>{t.learnStratMarkdown.split(":")[0]}:</strong>{t.learnStratMarkdown.slice(t.learnStratMarkdown.indexOf(":") + 1)}</li>
+            </ul>
+          </article>
+
+          <article className="learn-card">
+            <div className="learn-card-header">
+              <span className="learn-icon"><Network size={20} /></span>
+              <span className="learn-tag">{t.learnConcept4Tag}</span>
+            </div>
+            <h3>{t.learnConcept4Title}</h3>
+            <p>{t.learnConcept4Body}</p>
+            <div className="overlap-diagram">
+              <div className="overlap-bar bar-1"><span>Chunk N [ …texto final ]</span></div>
+              <div className="overlap-highlight"><span>{overlap} tokens compartilhados</span></div>
+              <div className="overlap-bar bar-2"><span>[ texto repetido… ] Chunk N+1</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <footer>
-        <div className="brand footer-brand"><span className="brand-mark"><span /></span><span>Token<span>Lab</span></span></div>
+        <div className="brand footer-brand">
+          <span className="brand-mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M7 6H5C3.89543 6 3 6.89543 3 8V16C3 17.1046 3.89543 18 5 18H7" stroke="var(--brand-green)" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M17 6H19C20.1046 6 21 6.89543 21 8V16C21 17.1046 20.1046 18 19 18H17" stroke="var(--brand-green)" strokeWidth="2.5" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="3.2" fill="var(--brand-green)" />
+            </svg>
+          </span>
+          <div className="brand-text">
+            <span className="brand-title">Token<span>Lab</span></span>
+            <span className="brand-subtitle">{t.scientataSubtitle}</span>
+          </div>
+        </div>
         <div className="footer-center">
           <p>{t.footerNote}</p>
-          <a className="footer-credit" href={AUTHOR_URL} target="_blank" rel="noopener noreferrer">{t.footerCredit}</a>
+          <a className="footer-credit" href={SCIENTATA_URL} target="_blank" rel="noopener noreferrer">{t.footerCredit}</a>
         </div>
         <span>{t.footerFilesNote}</span>
       </footer>
