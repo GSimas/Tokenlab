@@ -435,7 +435,7 @@ td small { display: block; color: var(--dark-faint); font: 400 9px/1 var(--font-
 /* Step 03 — cost estimate */
 .pricing-section { max-width: var(--content-width); margin: 0 auto; padding: 0 clamp(22px, 5vw, 76px) 88px; }
 .pricing-panel { border: 1px solid var(--border-subtle); background: var(--panel); padding: 26px; }
-.pricing-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.65fr); gap: 20px; align-items: start; }
+.pricing-controls { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 0.95fr) minmax(0, 1.2fr) minmax(0, 0.6fr); gap: 20px; align-items: start; }
 .pricing-field { min-width: 0; }
 .pricing-hint { display: block; margin-top: 9px; color: var(--faint); font: 400 10px/1.5 var(--font-technical); }
 .direction-toggle { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border-subtle); background: var(--surface); }
@@ -479,6 +479,10 @@ td small { display: block; color: var(--dark-faint); font: 400 9px/1 var(--font-
 .rate-input { display: flex; align-items: center; height: 50px; border: 1px solid var(--border-subtle); background: var(--surface); }
 .rate-input span { padding: 0 4px 0 14px; color: var(--muted); font: 600 12px/1 var(--font-technical); }
 .rate-input input { min-width: 0; flex: 1; height: 100%; border: 0; background: transparent; color: var(--text); padding: 0 12px 0 4px; font: 600 13px/1 var(--font-technical); }
+/* Campo do modo calculadora: ocupa o lugar da dica sob o seletor de origem. */
+.manual-tokens { height: 44px; margin-top: 9px; border-color: var(--accent); }
+.manual-tokens input { padding: 0 4px 0 14px; }
+.manual-tokens span { padding-right: 14px; color: var(--muted); font: 500 10px/1 var(--font-technical); text-transform: uppercase; letter-spacing: 0.05em; }
 
 .price-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border-strong); margin-top: 26px; }
 .price-card { min-height: 138px; padding: 22px; display: flex; flex-direction: column; border-right: 1px solid var(--border-strong); }

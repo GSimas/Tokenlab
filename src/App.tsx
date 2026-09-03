@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
-  AlertCircle, ArrowDownToLine, ArrowRight, ArrowUpFromLine, BarChart3, BookOpen, Check, ChevronDown,
+  AlertCircle, ArrowDownToLine, ArrowRight, ArrowUpFromLine, BarChart3, BookOpen, Calculator, Check, ChevronDown,
   Coffee, Coins, Cpu, Download, ExternalLink, FileSpreadsheet, FileText, Files, Info, Layers, Loader2,
   LockKeyhole, Moon, Network, RotateCcw, Search, Settings2, Sparkles, Split, Sun, Trash2, UploadCloud, X,
 } from "lucide-react";
@@ -217,6 +217,8 @@ export default function App() {
   const [contextLimit, setContextLimit] = useState(8191);
   const [activeMetric, setActiveMetric] = useState<"tokens" | "chunks">("tokens");
   const [priceDirection, setPriceDirection] = useState<"input" | "output">("input");
+  const [tokenSource, setTokenSource] = useState<"content" | "manual">("content");
+  const [manualTokens, setManualTokens] = useState(1000);
   const [priceModelId, setPriceModelId] = useState("openai/gpt-5.1");
   const [usdBrl, setUsdBrl] = useState(DEFAULT_USD_BRL);
   const [priceProviders, setPriceProviders] = useState<string[]>(PROVIDERS);
@@ -409,7 +411,10 @@ export default function App() {
 
   const priceEntry = PRICING.find((item) => item.id === priceModelId) ?? PRICING[0];
   const priceUnit = unitPrice(priceEntry, priceDirection);
-  const priceUsd = estimateCost(priceEntry, analysis.totalTokens, priceDirection);
+  // O passo 03 funciona tanto sobre o conteudo do passo 01 quanto sobre uma
+  // quantidade digitada a mao, no "modo calculadora".
+  const costTokens = tokenSource === "manual" ? manualTokens : analysis.totalTokens;
+  const priceUsd = estimateCost(priceEntry, costTokens, priceDirection);
 
   const priceOptions = buildPriceOptions(priceQuery);
 
@@ -418,7 +423,7 @@ export default function App() {
   const comparison = useMemo(() => {
     const base = PRICING
       .filter((entry) => priceProviders.includes(entry.provider) && unitPrice(entry, priceDirection) !== null)
-      .map((entry) => ({ entry, unit: unitPrice(entry, priceDirection) as number, cost: estimateCost(entry, analysis.totalTokens, priceDirection) as number }))
+      .map((entry) => ({ entry, unit: unitPrice(entry, priceDirection) as number, cost: estimateCost(entry, costTokens, priceDirection) as number }))
       .sort((a, b) => a.unit - b.unit);
     // Os preços cobrem mais de três ordens de grandeza (US$ 0,02 a US$ 180 por
     // 1M), então uma barra linear achataria quase todo o catálogo no mínimo.
@@ -431,7 +436,7 @@ export default function App() {
       share: row.unit <= 0 || span <= 0 ? 100 : 8 + ((Math.log10(row.unit) - min) / span) * 92,
     }));
     return { rows };
-  }, [priceProviders, priceDirection, analysis.totalTokens]);
+  }, [priceProviders, priceDirection, costTokens]);
 
   const handleExport = async (format: ExportFormat) => {
     setExportError("");
@@ -451,7 +456,7 @@ export default function App() {
           unitPrice: priceUnit,
           costUsd: priceUsd,
           usdBrl,
-          tokens: analysis.totalTokens,
+          tokens: costTokens,
           updatedAt: pricingDate,
           rows: comparison.rows.map((row) => ({
             provider: row.entry.provider,
@@ -594,6 +599,28 @@ export default function App() {
         <div className="pricing-panel">
           <div className="pricing-controls">
             <div className="pricing-field">
+              <span className="field-label">{t.priceSourceLabel}</span>
+              <div className="direction-toggle" role="group" aria-label={t.priceSourceLabel}>
+                <button className={tokenSource === "content" ? "active" : ""} onClick={() => setTokenSource("content")} aria-pressed={tokenSource === "content"}><FileText size={15} /> {t.priceSourceContent}</button>
+                <button className={tokenSource === "manual" ? "active" : ""} onClick={() => setTokenSource("manual")} aria-pressed={tokenSource === "manual"}><Calculator size={15} /> {t.priceSourceManual}</button>
+              </div>
+              {tokenSource === "manual" ? (
+                <div className="rate-input manual-tokens">
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={manualTokens}
+                    aria-label={t.priceManualLabel}
+                    onChange={(event) => setManualTokens(Math.max(0, Number(event.target.value) || 0))}
+                  />
+                  <span>{t.tokensSuffix}</span>
+                </div>
+              ) : (
+                <small className="pricing-hint">{fmt(t.priceSourceContentHint, { tokens: num(analysis.totalTokens) })}</small>
+              )}
+            </div>
+            <div className="pricing-field">
               <span className="field-label">{t.priceDirectionLabel}</span>
               <div className="direction-toggle" role="group" aria-label={t.priceDirectionLabel}>
                 <button className={priceDirection === "input" ? "active" : ""} onClick={() => setPriceDirection("input")} aria-pressed={priceDirection === "input"}><ArrowDownToLine size={15} /> {t.priceDirectionInput}</button>
@@ -665,7 +692,7 @@ export default function App() {
           </div>
 
           <div className="price-grid">
-            <article className="price-card"><span>{t.priceTokensCard}</span><strong>{num(analysis.totalTokens)}</strong><small>{t.priceTokensCardSub}</small></article>
+            <article className="price-card"><span>{t.priceTokensCard}</span><strong>{num(costTokens)}</strong><small>{tokenSource === "manual" ? t.priceTokensCardSubManual : t.priceTokensCardSub}</small></article>
             <article className="price-card"><span>{t.priceUnitCard}</span><strong>{formatUnitPrice(priceUnit, locale)}</strong><small>{t.priceUnitCardSub}</small></article>
             <article className="price-card highlight"><span>{t.priceUsdCard}</span><strong>{priceUsd === null ? "—" : formatMoney(priceUsd, "USD", locale)}</strong><small>{t.priceUsdCardSub}</small></article>
             <article className="price-card"><span>{t.priceBrlCard}</span><strong>{priceUsd === null ? "—" : formatMoney(priceUsd * usdBrl, "BRL", locale)}</strong><small>{fmt(t.priceBrlCardSub, { rate: formatMoney(usdBrl, "BRL", locale) })}</small></article>
@@ -673,7 +700,7 @@ export default function App() {
 
           {priceUnit === null && <p className="pricing-warning"><AlertCircle size={14} /> {t.priceNoOutput}</p>}
           {priceEntry.note && <p className="pricing-warning"><Info size={14} /> {priceEntry.note[locale]}</p>}
-          {!analysis.totalTokens && <p className="pricing-warning"><Info size={14} /> {t.priceEmpty}</p>}
+          {tokenSource === "content" && !analysis.totalTokens && <p className="pricing-warning"><Info size={14} /> {t.priceEmpty}</p>}
 
           <div className="compare-block">
             <div className="panel-title-row">
@@ -746,7 +773,7 @@ export default function App() {
             <div className="price-tip-line"><span>{t.priceTableIn}</span><b>{formatUnitPrice(hoveredPrice.row.entry.input, locale)}</b></div>
             <div className="price-tip-line"><span>{t.priceTableOut}</span><b>{formatUnitPrice(hoveredPrice.row.entry.output, locale)}</b></div>
             <div className="price-tip-line total">
-              <span>{fmt(t.priceTipCost, { tokens: num(analysis.totalTokens), direction: priceDirection === "input" ? t.priceDirectionInput.toLowerCase() : t.priceDirectionOutput.toLowerCase() })}</span>
+              <span>{fmt(t.priceTipCost, { tokens: num(costTokens), direction: priceDirection === "input" ? t.priceDirectionInput.toLowerCase() : t.priceDirectionOutput.toLowerCase() })}</span>
               <b>{formatMoney(hoveredPrice.row.cost, "USD", locale)} · {formatMoney(hoveredPrice.row.cost * usdBrl, "BRL", locale)}</b>
             </div>
             <small>{fmt(t.priceTipDate, { date: pricingDate })}</small>
