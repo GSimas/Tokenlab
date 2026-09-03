@@ -441,6 +441,41 @@ td small { display: block; color: var(--dark-faint); font: 400 9px/1 var(--font-
 .direction-toggle { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border-subtle); background: var(--surface); }
 .direction-toggle button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; height: 44px; border: 0; background: transparent; color: var(--muted); font: 650 11px/1 var(--font-technical); text-transform: uppercase; letter-spacing: 0.05em; }
 .direction-toggle button.active { background: var(--accent); color: var(--accent-ink); }
+/* Combobox com busca do modelo de referência. */
+.combo { position: relative; }
+.combo-field { display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 14px; border: 1px solid var(--border-subtle); background: var(--surface); }
+.combo-field > svg:first-child { flex: 0 0 auto; color: var(--muted); }
+.combo-field > svg:last-child { flex: 0 0 auto; color: var(--muted); transition: transform var(--motion-fast) var(--motion-easing); }
+.combo-field > svg.rotated { transform: rotate(180deg); }
+.combo-field input { min-width: 0; flex: 1; height: 100%; border: 0; background: transparent; color: var(--text); font-size: 13px; font-weight: 600; text-overflow: ellipsis; }
+.combo-field input::placeholder { color: var(--faint); font-weight: 500; }
+.combo-field input:focus-visible { outline: none; }
+.combo.open .combo-field { border-color: var(--accent); }
+.combo.open .combo-field > svg:first-child { color: var(--accent); }
+
+.combo-list {
+  position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 288px; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--accent);
+  box-shadow: 0 18px 44px var(--shadow-color);
+}
+.combo-group + .combo-group { border-top: 1px solid var(--border-subtle); }
+.combo-group-label {
+  position: sticky; top: 0; z-index: 1; display: block; padding: 9px 14px 7px;
+  background: var(--panel); color: var(--faint);
+  font: 650 9px/1 var(--font-technical); text-transform: uppercase; letter-spacing: 0.09em;
+}
+/* scroll-margin-top reserva a altura do rótulo fixo do grupo, senão o
+   scrollIntoView do teclado esconde a opção ativa atrás dele. */
+.combo-option { display: flex; align-items: center; gap: 10px; padding: 9px 14px; scroll-margin: 32px 0 6px; cursor: pointer; font: 550 12px/1.2 var(--font-interface); color: var(--text); }
+.combo-option > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-option > b { flex: 0 0 auto; color: var(--muted); font: 600 10px/1 var(--font-technical); }
+.combo-option > svg { flex: 0 0 auto; color: var(--accent); }
+.combo-option.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.combo-option.selected { color: var(--accent); font-weight: 700; }
+.combo-option.selected > b { color: var(--accent); }
+.combo-empty { margin: 0; padding: 22px 14px; text-align: center; color: var(--muted); font-size: 12px; }
+
 .rate-input { display: flex; align-items: center; height: 50px; border: 1px solid var(--border-subtle); background: var(--surface); }
 .rate-input span { padding: 0 4px 0 14px; color: var(--muted); font: 600 12px/1 var(--font-technical); }
 .rate-input input { min-width: 0; flex: 1; height: 100%; border: 0; background: transparent; color: var(--text); padding: 0 12px 0 4px; font: 600 13px/1 var(--font-technical); }

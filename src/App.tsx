@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   AlertCircle, ArrowDownToLine, ArrowRight, ArrowUpFromLine, BarChart3, BookOpen, Check, ChevronDown,
   Coffee, Coins, Cpu, Download, ExternalLink, FileSpreadsheet, FileText, Files, Info, Layers, Loader2,
-  LockKeyhole, Moon, Network, RotateCcw, Settings2, Sparkles, Split, Sun, Trash2, UploadCloud, X,
+  LockKeyhole, Moon, Network, RotateCcw, Search, Settings2, Sparkles, Split, Sun, Trash2, UploadCloud, X,
 } from "lucide-react";
 import { countTokens as countCl100k } from "gpt-tokenizer/encoding/cl100k_base";
 import * as XLSX from "xlsx";
@@ -75,6 +76,7 @@ Always protect personal data and route sensitive cases to the responsible team. 
 
 const ACCEPTED = ".txt,.md,.csv,.json,.html,.xml,.yaml,.yml,.log,.rtf,.pdf,.docx,.xlsx,.xls";
 const DEFAULT_USD_BRL = 5.4;
+const normalizeSearch = (value: string) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 const formatNumber = (value: number, locale: Locale) => new Intl.NumberFormat(locale === "pt" ? "pt-BR" : "en-US").format(Math.round(value || 0));
 const formatBytes = (bytes: number, pastedLabel: string) => {
   if (!bytes) return pastedLabel;
@@ -86,6 +88,29 @@ function countForModel(text: string, model: ModelPreset) {
   if (!text.trim()) return 0;
   if (model.tokenizer === "cl100k") return countCl100k(text);
   return Math.max(1, Math.ceil(text.length / 4));
+}
+
+/**
+ * Opções do combobox de preço. Todos os termos digitados precisam aparecer em
+ * "provedor + modelo", então "openai nano" encontra gpt-5-nano. O catálogo já
+ * vem ordenado por provedor, então agrupar sequências consecutivas basta — e
+ * carregar o índice de cada opção evita um indexOf por linha na renderização.
+ */
+function buildPriceOptions(query: string) {
+  const terms = normalizeSearch(query).split(/\s+/).filter(Boolean);
+  const flat = PRICING.filter((entry) => {
+    if (!terms.length) return true;
+    const haystack = normalizeSearch(`${entry.provider} ${entry.name}`);
+    return terms.every((term) => haystack.includes(term));
+  });
+  const groups: { provider: string; entries: { entry: PriceEntry; index: number }[] }[] = [];
+  for (let index = 0; index < flat.length; index += 1) {
+    const entry = flat[index];
+    const last = groups.length ? groups[groups.length - 1] : null;
+    if (last && last.provider === entry.provider) last.entries.push({ entry, index });
+    else groups.push({ provider: entry.provider, entries: [{ entry, index }] });
+  }
+  return { flat, groups };
 }
 
 function normalizeText(text: string) {
@@ -196,11 +221,17 @@ export default function App() {
   const [usdBrl, setUsdBrl] = useState(DEFAULT_USD_BRL);
   const [priceProviders, setPriceProviders] = useState<string[]>(PROVIDERS);
   const [hoveredPrice, setHoveredPrice] = useState<{ row: ComparisonRow; x: number; y: number } | null>(null);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [priceQuery, setPriceQuery] = useState("");
+  const [priceActive, setPriceActive] = useState(0);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState<ExportFormat | null>(null);
   const [exportError, setExportError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const priceComboRef = useRef<HTMLDivElement>(null);
+  const priceInputRef = useRef<HTMLInputElement>(null);
+  const priceListRef = useRef<HTMLDivElement>(null);
   const model = MODELS.find((item) => item.id === modelId) ?? MODELS[0];
   const t = getDict(locale);
   const theme = themeOverride ?? (systemDark ? "dark" : "light");
@@ -267,6 +298,60 @@ export default function App() {
     };
   }, [exportMenuOpen]);
 
+  useEffect(() => {
+    if (!priceOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (priceComboRef.current && !priceComboRef.current.contains(event.target as Node)) setPriceOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [priceOpen]);
+
+  useEffect(() => {
+    if (!priceOpen) return;
+    priceListRef.current?.querySelector(`[data-index="${priceActive}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [priceOpen, priceActive]);
+
+  const openPriceCombo = () => {
+    if (priceOpen) return;
+    setPriceOpen(true);
+    setPriceQuery("");
+    setPriceActive(Math.max(0, PRICING.findIndex((item) => item.id === priceModelId)));
+  };
+
+  const selectPriceModel = (id: string) => {
+    setPriceModelId(id);
+    setPriceOpen(false);
+    setPriceQuery("");
+    priceInputRef.current?.blur();
+  };
+
+  const onPriceComboKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!priceOpen) return openPriceCombo();
+      const total = priceOptions.flat.length;
+      if (!total) return;
+      setPriceActive((current) => (current + (event.key === "ArrowDown" ? 1 : -1) + total) % total);
+      return;
+    }
+    if (event.key === "Enter" && priceOpen) {
+      const option = priceOptions.flat[priceActive];
+      if (option) {
+        event.preventDefault();
+        selectPriceModel(option.id);
+      }
+      return;
+    }
+    if (event.key === "Escape" && priceOpen) {
+      event.preventDefault();
+      setPriceOpen(false);
+      setPriceQuery("");
+      return;
+    }
+    if (event.key === "Tab") setPriceOpen(false);
+  };
+
   const changeModel = (value: string) => {
     const next = MODELS.find((item) => item.id === value) ?? MODELS[0];
     setModelId(value);
@@ -326,15 +411,7 @@ export default function App() {
   const priceUnit = unitPrice(priceEntry, priceDirection);
   const priceUsd = estimateCost(priceEntry, analysis.totalTokens, priceDirection);
 
-  const priceByProvider = useMemo(() => {
-    const groups = new Map<string, PriceEntry[]>();
-    for (const entry of PRICING) {
-      const bucket = groups.get(entry.provider);
-      if (bucket) bucket.push(entry);
-      else groups.set(entry.provider, [entry]);
-    }
-    return [...groups.entries()];
-  }, []);
+  const priceOptions = buildPriceOptions(priceQuery);
 
   // Só entram no comparativo os modelos que cobram na direção escolhida —
   // embeddings desaparecem quando a leitura é de saída.
@@ -526,17 +603,59 @@ export default function App() {
             </div>
             <div className="pricing-field">
               <label className="field-label" htmlFor="price-model">{t.priceModelLabel}</label>
-              <div className="select-wrap">
-                <select id="price-model" value={priceModelId} onChange={(event) => setPriceModelId(event.target.value)}>
-                  {priceByProvider.map(([provider, entries]) => (
-                    <optgroup label={provider} key={provider}>
-                      {entries.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-                <ChevronDown size={17} />
+              <div className={`combo ${priceOpen ? "open" : ""}`} ref={priceComboRef}>
+                <div className="combo-field">
+                  {priceOpen ? <Search size={16} /> : <Sparkles size={16} />}
+                  <input
+                    id="price-model"
+                    ref={priceInputRef}
+                    type="text"
+                    role="combobox"
+                    autoComplete="off"
+                    spellCheck="false"
+                    aria-expanded={priceOpen}
+                    aria-controls="price-model-list"
+                    aria-autocomplete="list"
+                    aria-activedescendant={priceOpen && priceOptions.flat[priceActive] ? `price-option-${priceActive}` : undefined}
+                    value={priceOpen ? priceQuery : priceEntry.name}
+                    placeholder={priceOpen ? t.priceSearchPlaceholder : undefined}
+                    onFocus={openPriceCombo}
+                    onClick={openPriceCombo}
+                    onChange={(event) => { setPriceQuery(event.target.value); setPriceActive(0); }}
+                    onKeyDown={onPriceComboKeyDown}
+                  />
+                  <ChevronDown size={17} className={priceOpen ? "rotated" : ""} />
+                </div>
+                {priceOpen && (
+                  <div className="combo-list" id="price-model-list" role="listbox" aria-label={t.priceModelLabel} ref={priceListRef}>
+                    {priceOptions.flat.length ? priceOptions.groups.map((group) => (
+                      <div className="combo-group" key={group.provider}>
+                        <span className="combo-group-label">{group.provider}</span>
+                        {group.entries.map(({ entry, index }) => {
+                          const selected = entry.id === priceModelId;
+                          return (
+                            <div
+                              key={entry.id}
+                              id={`price-option-${index}`}
+                              data-index={index}
+                              role="option"
+                              aria-selected={selected}
+                              className={`combo-option ${index === priceActive ? "active" : ""} ${selected ? "selected" : ""}`}
+                              onMouseEnter={() => setPriceActive(index)}
+                              onMouseDown={(event) => { event.preventDefault(); selectPriceModel(entry.id); }}
+                            >
+                              <span>{entry.name}</span>
+                              <b>{formatUnitPrice(unitPrice(entry, priceDirection), locale)}</b>
+                              {selected && <Check size={14} />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )) : <p className="combo-empty">{t.priceSearchEmpty}</p>}
+                  </div>
+                )}
               </div>
-              <small className="pricing-hint">{fmt(t.priceModelCount, { models: num(PRICING.length), providers: num(PROVIDERS.length) })}</small>
+              <small className="pricing-hint">{fmt(t.priceModelCount, { models: num(priceOptions.flat.length), providers: num(priceOptions.groups.length) })}</small>
             </div>
             <div className="pricing-field">
               <label className="field-label" htmlFor="usd-brl">{t.priceRateLabel}</label>
