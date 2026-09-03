@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
-  AlertCircle, ArrowRight, BarChart3, BookOpen, Check, ChevronDown, Coffee, Cpu, Download,
-  FileSpreadsheet, FileText, Files, Info, Layers, Loader2, LockKeyhole, Moon,
-  Network, RotateCcw, Settings2, Sparkles, Split, Sun, Trash2, UploadCloud, X,
+  AlertCircle, ArrowDownToLine, ArrowRight, ArrowUpFromLine, BarChart3, BookOpen, Check, ChevronDown,
+  Coffee, Coins, Cpu, Download, ExternalLink, FileSpreadsheet, FileText, Files, Info, Layers, Loader2,
+  LockKeyhole, Moon, Network, RotateCcw, Settings2, Sparkles, Split, Sun, Trash2, UploadCloud, X,
 } from "lucide-react";
 import { countTokens as countCl100k } from "gpt-tokenizer/encoding/cl100k_base";
 import * as XLSX from "xlsx";
 import { detectLocale, fmt, getDict, getSystemDarkServerSnapshot, getSystemDarkSnapshot, modelDetail, subscribeSystemDark, type Locale } from "./i18n";
 import { runExport, type ExportData, type ExportFormat } from "./export";
+import { estimateCost, formatMoney, formatUnitPrice, PRICING, PRICING_SOURCES, PRICING_UPDATED_AT, PROVIDERS, unitPrice, type PriceEntry } from "./pricing";
 
 const SCIENTATA_URL = "https://scientata.com";
 const GITHUB_URL = "https://github.com/GSimas/Tokenlab";
@@ -29,6 +30,8 @@ type SourceDoc = {
   text: string;
   size: number;
 };
+
+type ComparisonRow = { entry: PriceEntry; unit: number; cost: number; share: number };
 
 type ModelPreset = {
   id: string;
@@ -71,6 +74,7 @@ Our goal is to resolve requests with clarity, speed and empathy. Every interacti
 Always protect personal data and route sensitive cases to the responsible team. Before closing, confirm that the customer understood the resolution.`;
 
 const ACCEPTED = ".txt,.md,.csv,.json,.html,.xml,.yaml,.yml,.log,.rtf,.pdf,.docx,.xlsx,.xls";
+const DEFAULT_USD_BRL = 5.4;
 const formatNumber = (value: number, locale: Locale) => new Intl.NumberFormat(locale === "pt" ? "pt-BR" : "en-US").format(Math.round(value || 0));
 const formatBytes = (bytes: number, pastedLabel: string) => {
   if (!bytes) return pastedLabel;
@@ -187,6 +191,11 @@ export default function App() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [contextLimit, setContextLimit] = useState(8191);
   const [activeMetric, setActiveMetric] = useState<"tokens" | "chunks">("tokens");
+  const [priceDirection, setPriceDirection] = useState<"input" | "output">("input");
+  const [priceModelId, setPriceModelId] = useState("openai/gpt-5.1");
+  const [usdBrl, setUsdBrl] = useState(DEFAULT_USD_BRL);
+  const [priceProviders, setPriceProviders] = useState<string[]>(PROVIDERS);
+  const [hoveredPrice, setHoveredPrice] = useState<{ row: ComparisonRow; x: number; y: number } | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState<ExportFormat | null>(null);
   const [exportError, setExportError] = useState("");
@@ -205,8 +214,21 @@ export default function App() {
     let stored: string | null = null;
     try { stored = localStorage.getItem("tokenlab-theme"); } catch { /* ignore */ }
     if (stored === "dark" || stored === "light") setThemeOverride(stored);
+    let storedRate: string | null = null;
+    try { storedRate = localStorage.getItem("tokenlab-usd-brl"); } catch { /* ignore */ }
+    const parsedRate = Number(storedRate);
+    if (storedRate && Number.isFinite(parsedRate) && parsedRate > 0) setUsdBrl(parsedRate);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  const changeRate = (value: number) => {
+    setUsdBrl(value);
+    try { localStorage.setItem("tokenlab-usd-brl", String(value)); } catch { /* ignore */ }
+  };
+
+  const toggleProvider = (provider: string) => {
+    setPriceProviders((current) => current.includes(provider) ? current.filter((item) => item !== provider) : [...current, provider]);
+  };
 
   useEffect(() => {
     document.documentElement.lang = locale === "pt" ? "pt-BR" : "en";
@@ -300,6 +322,40 @@ export default function App() {
     };
   }, [sources, model, chunkSize, overlap, strategy, contextLimit, batchSize]);
 
+  const priceEntry = PRICING.find((item) => item.id === priceModelId) ?? PRICING[0];
+  const priceUnit = unitPrice(priceEntry, priceDirection);
+  const priceUsd = estimateCost(priceEntry, analysis.totalTokens, priceDirection);
+
+  const priceByProvider = useMemo(() => {
+    const groups = new Map<string, PriceEntry[]>();
+    for (const entry of PRICING) {
+      const bucket = groups.get(entry.provider);
+      if (bucket) bucket.push(entry);
+      else groups.set(entry.provider, [entry]);
+    }
+    return [...groups.entries()];
+  }, []);
+
+  // Só entram no comparativo os modelos que cobram na direção escolhida —
+  // embeddings desaparecem quando a leitura é de saída.
+  const comparison = useMemo(() => {
+    const base = PRICING
+      .filter((entry) => priceProviders.includes(entry.provider) && unitPrice(entry, priceDirection) !== null)
+      .map((entry) => ({ entry, unit: unitPrice(entry, priceDirection) as number, cost: estimateCost(entry, analysis.totalTokens, priceDirection) as number }))
+      .sort((a, b) => a.unit - b.unit);
+    // Os preços cobrem mais de três ordens de grandeza (US$ 0,02 a US$ 180 por
+    // 1M), então uma barra linear achataria quase todo o catálogo no mínimo.
+    const units = base.map((row) => row.unit).filter((unit) => unit > 0);
+    const min = units.length ? Math.log10(Math.min(...units)) : 0;
+    const max = units.length ? Math.log10(Math.max(...units)) : 0;
+    const span = max - min;
+    const rows: ComparisonRow[] = base.map((row) => ({
+      ...row,
+      share: row.unit <= 0 || span <= 0 ? 100 : 8 + ((Math.log10(row.unit) - min) / span) * 92,
+    }));
+    return { rows };
+  }, [priceProviders, priceDirection, analysis.totalTokens]);
+
   const handleExport = async (format: ExportFormat) => {
     setExportError("");
     setExportBusy(format);
@@ -311,6 +367,23 @@ export default function App() {
         totalChunks: analysis.totalChunks,
         avgChunk: analysis.avgChunk,
         modelName: model.name,
+        cost: {
+          provider: priceEntry.provider,
+          modelName: priceEntry.name,
+          directionLabel: priceDirection === "input" ? t.priceDirectionInput : t.priceDirectionOutput,
+          unitPrice: priceUnit,
+          costUsd: priceUsd,
+          usdBrl,
+          tokens: analysis.totalTokens,
+          updatedAt: pricingDate,
+          rows: comparison.rows.map((row) => ({
+            provider: row.entry.provider,
+            model: row.entry.name,
+            input: row.entry.input,
+            output: row.entry.output,
+            costUsd: row.cost,
+          })),
+        },
       };
       await runExport(format, data, t, locale);
     } catch (error) {
@@ -324,6 +397,7 @@ export default function App() {
   const maxBar = Math.max(1, ...analysis.rows.map((row) => activeMetric === "tokens" ? row.tokens : row.chunks));
   const heroLines = t.heroTitle.split("\n");
   const num = (value: number) => formatNumber(value, locale);
+  const pricingDate = new Date(`${PRICING_UPDATED_AT}T00:00:00`).toLocaleDateString(locale === "pt" ? "pt-BR" : "en-US", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
     <main>
@@ -438,9 +512,132 @@ export default function App() {
         </aside>
       </section>
 
+      <section className="pricing-section" id="pricing">
+        <div className="section-heading"><span className="step-number">03</span><div><h2>{t.step3Title}</h2><p>{t.step3Subtitle}</p></div></div>
+        <div className="pricing-panel">
+          <div className="pricing-controls">
+            <div className="pricing-field">
+              <span className="field-label">{t.priceDirectionLabel}</span>
+              <div className="direction-toggle" role="group" aria-label={t.priceDirectionLabel}>
+                <button className={priceDirection === "input" ? "active" : ""} onClick={() => setPriceDirection("input")} aria-pressed={priceDirection === "input"}><ArrowDownToLine size={15} /> {t.priceDirectionInput}</button>
+                <button className={priceDirection === "output" ? "active" : ""} onClick={() => setPriceDirection("output")} aria-pressed={priceDirection === "output"}><ArrowUpFromLine size={15} /> {t.priceDirectionOutput}</button>
+              </div>
+              <small className="pricing-hint">{priceDirection === "input" ? t.priceDirectionInputHint : t.priceDirectionOutputHint}</small>
+            </div>
+            <div className="pricing-field">
+              <label className="field-label" htmlFor="price-model">{t.priceModelLabel}</label>
+              <div className="select-wrap">
+                <select id="price-model" value={priceModelId} onChange={(event) => setPriceModelId(event.target.value)}>
+                  {priceByProvider.map(([provider, entries]) => (
+                    <optgroup label={provider} key={provider}>
+                      {entries.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                <ChevronDown size={17} />
+              </div>
+              <small className="pricing-hint">{fmt(t.priceModelCount, { models: num(PRICING.length), providers: num(PROVIDERS.length) })}</small>
+            </div>
+            <div className="pricing-field">
+              <label className="field-label" htmlFor="usd-brl">{t.priceRateLabel}</label>
+              <div className="rate-input"><span>R$</span><input id="usd-brl" type="number" min="0" step="0.01" value={usdBrl} onChange={(event) => changeRate(Number(event.target.value) || 0)} /></div>
+              <small className="pricing-hint">{t.priceRateNote}</small>
+            </div>
+          </div>
+
+          <div className="price-grid">
+            <article className="price-card"><span>{t.priceTokensCard}</span><strong>{num(analysis.totalTokens)}</strong><small>{t.priceTokensCardSub}</small></article>
+            <article className="price-card"><span>{t.priceUnitCard}</span><strong>{formatUnitPrice(priceUnit, locale)}</strong><small>{t.priceUnitCardSub}</small></article>
+            <article className="price-card highlight"><span>{t.priceUsdCard}</span><strong>{priceUsd === null ? "—" : formatMoney(priceUsd, "USD", locale)}</strong><small>{t.priceUsdCardSub}</small></article>
+            <article className="price-card"><span>{t.priceBrlCard}</span><strong>{priceUsd === null ? "—" : formatMoney(priceUsd * usdBrl, "BRL", locale)}</strong><small>{fmt(t.priceBrlCardSub, { rate: formatMoney(usdBrl, "BRL", locale) })}</small></article>
+          </div>
+
+          {priceUnit === null && <p className="pricing-warning"><AlertCircle size={14} /> {t.priceNoOutput}</p>}
+          {priceEntry.note && <p className="pricing-warning"><Info size={14} /> {priceEntry.note[locale]}</p>}
+          {!analysis.totalTokens && <p className="pricing-warning"><Info size={14} /> {t.priceEmpty}</p>}
+
+          <div className="compare-block">
+            <div className="panel-title-row">
+              <div><h3>{t.priceCompareTitle}</h3><p>{t.priceCompareSubtitle}</p></div>
+              <div className="provider-filter" role="group" aria-label={t.priceFilterLabel}>
+                <button
+                  className={priceProviders.length === PROVIDERS.length ? "active" : ""}
+                  onClick={() => setPriceProviders(priceProviders.length === PROVIDERS.length ? [] : PROVIDERS)}
+                  aria-pressed={priceProviders.length === PROVIDERS.length}
+                >{t.priceFilterAll}</button>
+                {PROVIDERS.map((provider) => <button key={provider} className={priceProviders.includes(provider) ? "active" : ""} onClick={() => toggleProvider(provider)} aria-pressed={priceProviders.includes(provider)}>{provider}</button>)}
+              </div>
+            </div>
+            {comparison.rows.length ? (
+              <>
+                <div className="price-bars" onScroll={() => setHoveredPrice(null)}>
+                  {comparison.rows.map((row) => (
+                    <div
+                      className={`price-bar-row ${row.entry.id === priceEntry.id ? "selected" : ""}`}
+                      key={row.entry.id}
+                      onMouseEnter={(event) => setHoveredPrice({ row, x: event.clientX, y: event.clientY })}
+                      onMouseLeave={() => setHoveredPrice(null)}
+                    >
+                      <span className="price-bar-label">{row.entry.name}</span>
+                      <div className="price-bar-track"><span style={{ width: `${row.share}%` }} /></div>
+                      <strong>{formatMoney(row.cost, "USD", locale)}</strong>
+                    </div>
+                  ))}
+                </div>
+                <div className="price-table-wrap">
+                  <table>
+                    <thead><tr><th>{t.priceTableProvider}</th><th>{t.priceTableModel}</th><th>{t.priceTableIn}</th><th>{t.priceTableOut}</th><th>{t.priceTableCostUsd}</th><th>{t.priceTableCostBrl}</th></tr></thead>
+                    <tbody>
+                      {comparison.rows.map((row) => (
+                        <tr key={`price-${row.entry.id}`} className={row.entry.id === priceEntry.id ? "selected" : ""}>
+                          <td>{row.entry.provider}</td>
+                          <td><span className="source-name">{row.entry.name}</span></td>
+                          <td>{formatUnitPrice(row.entry.input, locale)}</td>
+                          <td>{formatUnitPrice(row.entry.output, locale)}</td>
+                          <td>{formatMoney(row.cost, "USD", locale)}</td>
+                          <td>{formatMoney(row.cost * usdBrl, "BRL", locale)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : <p className="pricing-warning"><AlertCircle size={14} /> {t.priceFilterNone}</p>}
+          </div>
+
+          <div className="pricing-footnote">
+            <p><Coins size={13} /> {fmt(t.priceUpdatedNote, { date: pricingDate })}</p>
+            <p className="pricing-sources">
+              <span>{t.priceSourcesLabel}:</span>
+              {PRICING_SOURCES.map((source) => <a key={source.provider} href={source.url} target="_blank" rel="noopener noreferrer">{source.provider} <ExternalLink size={10} /></a>)}
+            </p>
+          </div>
+        </div>
+        {hoveredPrice && (
+          <div
+            className="price-tip"
+            role="tooltip"
+            style={{
+              left: Math.max(12, Math.min(hoveredPrice.x + 18, window.innerWidth - 292)),
+              top: hoveredPrice.y + 190 > window.innerHeight ? Math.max(12, hoveredPrice.y - 190) : hoveredPrice.y + 18,
+            }}
+          >
+            <strong>{hoveredPrice.row.entry.name}</strong>
+            <span className="price-tip-provider">{hoveredPrice.row.entry.provider}</span>
+            <div className="price-tip-line"><span>{t.priceTableIn}</span><b>{formatUnitPrice(hoveredPrice.row.entry.input, locale)}</b></div>
+            <div className="price-tip-line"><span>{t.priceTableOut}</span><b>{formatUnitPrice(hoveredPrice.row.entry.output, locale)}</b></div>
+            <div className="price-tip-line total">
+              <span>{fmt(t.priceTipCost, { tokens: num(analysis.totalTokens), direction: priceDirection === "input" ? t.priceDirectionInput.toLowerCase() : t.priceDirectionOutput.toLowerCase() })}</span>
+              <b>{formatMoney(hoveredPrice.row.cost, "USD", locale)} · {formatMoney(hoveredPrice.row.cost * usdBrl, "BRL", locale)}</b>
+            </div>
+            <small>{fmt(t.priceTipDate, { date: pricingDate })}</small>
+          </div>
+        )}
+      </section>
+
       <section className="results-section">
         <div className="results-heading">
-          <div className="section-heading"><span className="step-number inverted">03</span><div><h2>{t.step3Title}</h2><p>{fmt(t.step3Subtitle, { model: model.name })}</p></div></div>
+          <div className="section-heading"><span className="step-number inverted">04</span><div><h2>{t.step4Title}</h2><p>{fmt(t.step4Subtitle, { model: model.name })}</p></div></div>
           <div className={`status-chip ${analysis.overLimit ? "warning" : ""}`}>{analysis.overLimit ? <AlertCircle size={15} /> : <Check size={15} />}{analysis.overLimit ? fmt(t.statusOverLimit, { count: analysis.overLimit }) : t.statusOk}</div>
         </div>
         <div className="metric-grid">
