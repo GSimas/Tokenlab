@@ -9,6 +9,7 @@ import { countTokens as countCl100k } from "gpt-tokenizer/encoding/cl100k_base";
 import * as XLSX from "xlsx";
 import { detectLocale, fmt, getDict, getSystemDarkServerSnapshot, getSystemDarkSnapshot, modelDetail, subscribeSystemDark, type Locale } from "./i18n";
 import { runExport, type ExportData, type ExportFormat } from "./export";
+import { HintTip, Select } from "./Select";
 import { estimateCost, formatMoney, formatUnitPrice, PRICING, PRICING_SOURCES, PRICING_UPDATED_AT, PROVIDERS, unitPrice, type PriceEntry } from "./pricing";
 
 const SCIENTATA_URL = "https://scientata.com";
@@ -85,6 +86,9 @@ const MODEL_GROUPS = MODELS.reduce<{ provider: string; models: ModelPreset[] }[]
   else groups.push({ provider: model.provider, models: [model] });
   return groups;
 }, []);
+
+// "8k", "32k", "128k" — o piso por mil mantém 8191 e 8192 no mesmo rótulo.
+const formatLimit = (limit: number) => (limit >= 1000 ? `${Math.floor(limit / 1000)}k` : String(limit));
 
 const SAMPLE_PT = `# Política de atendimento ao cliente
 
@@ -542,14 +546,13 @@ export default function App() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={t.scientataTooltip}
-            title={t.scientataTooltip}
           >
             <span className="spark-button-icon"><Sparkles size={16} /></span>
             <span className="spark-button-text">Scientata</span>
           </a>
-          <a className="icon-button" href={GITHUB_URL} target="_blank" rel="noopener noreferrer" aria-label={t.githubLabel} title={t.githubLabel}><GithubMark size={17} /></a>
-          <button className="locale-button" onClick={toggleLocale} aria-label={t.localeToggle} title={t.localeToggle}>{locale === "pt" ? "EN" : "PT"}</button>
-          <button className="icon-button" onClick={toggleTheme} aria-label={t.themeToggle} title={t.themeToggle}>{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
+          <a className="icon-button" href={GITHUB_URL} target="_blank" rel="noopener noreferrer" aria-label={t.githubLabel} data-tooltip={t.githubLabel}><GithubMark size={17} /></a>
+          <button className="locale-button" onClick={toggleLocale} aria-label={t.localeToggle} data-tooltip={t.localeToggle}>{locale === "pt" ? "EN" : "PT"}</button>
+          <button className="icon-button" onClick={toggleTheme} aria-label={t.themeToggle} data-tooltip={t.themeToggle}>{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
           <div className="export-menu" ref={exportMenuRef}>
             <button
               className="ghost-button"
@@ -616,18 +619,26 @@ export default function App() {
           <div className="section-heading"><span className="step-number">02</span><div><h2>{t.step2Title}</h2><p>{t.step2Subtitle}</p></div></div>
           <div className="config-panel">
             <label className="field-label" htmlFor="model">{t.modelLabel}</label>
-            <div className="select-wrap"><select id="model" value={modelId} onChange={(event) => changeModel(event.target.value)}>{MODEL_GROUPS.map((group) => group.provider
-              ? <optgroup label={group.provider} key={group.provider}>{group.models.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</optgroup>
-              : group.models.map((item) => <option value={item.id} key={item.id}>{modelDetail(item.id, locale)}</option>))}</select><ChevronDown size={17} /></div>
+            <Select
+              id="model"
+              value={modelId}
+              onChange={changeModel}
+              title={t.modelLabel}
+              closeLabel={t.selectClose}
+              groups={MODEL_GROUPS.map((group) => ({
+                label: group.provider || undefined,
+                options: group.models.map((item) => ({ value: item.id, label: item.name || modelDetail(item.id, locale), meta: `${formatLimit(item.limit)} ${t.tokensSuffix}` })),
+              }))}
+            />
             <div className="model-meta"><span><Sparkles size={14} /> {modelDetail(model.id, locale)}</span><span>{model.tokenizer === "cl100k" ? t.tokenizerExact : t.tokenizerEstimate}</span></div>
             <div className="field-grid">
-              <div><label className="field-label" htmlFor="strategy">{t.splitLabel}</label><div className="select-wrap compact"><select id="strategy" value={strategy} onChange={(event) => setStrategy(event.target.value)}><option value="recursive">{t.splitRecursive}</option><option value="paragraph">{t.splitParagraph}</option><option value="markdown">{t.splitMarkdown}</option></select><ChevronDown size={16} /></div></div>
-              <div><label className="field-label" htmlFor="batch">{t.batchLabel}</label><input id="batch" className="number-input" type="number" min="1" max="2048" value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value) || 1)} /></div>
+              <div><label className="field-label" htmlFor="strategy">{t.splitLabel}</label><Select id="strategy" compact value={strategy} onChange={setStrategy} title={t.splitLabel} closeLabel={t.selectClose} groups={[{ options: [{ value: "recursive", label: t.splitRecursive }, { value: "paragraph", label: t.splitParagraph }, { value: "markdown", label: t.splitMarkdown }] }]} /></div>
+              <div><label className="field-label" htmlFor="batch">{t.batchLabel}</label><input id="batch" className="number-input" type="number" inputMode="numeric" min="1" max="2048" value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value) || 1)} /></div>
             </div>
             <div className="slider-field"><div className="slider-label"><label htmlFor="chunk">{t.chunkSizeLabel}</label><strong>{chunkSize} <small>{t.tokensSuffix}</small></strong></div><input id="chunk" type="range" min="128" max="2048" step="64" value={chunkSize} onChange={(event) => { const next = Number(event.target.value); setChunkSize(next); if (overlap >= next) setOverlap(Math.max(0, next - 64)); }} /><div className="range-notes"><span>{t.chunkPrecisionHint}</span><span>{t.chunkContextHint}</span></div></div>
             <div className="slider-field"><div className="slider-label"><label htmlFor="overlap">{t.overlapLabel}</label><strong>{overlap} <small>{t.tokensSuffix}</small></strong></div><input id="overlap" type="range" min="0" max={Math.max(0, chunkSize - 64)} step="16" value={Math.min(overlap, chunkSize - 64)} onChange={(event) => setOverlap(Number(event.target.value))} /><div className="range-notes"><span>0</span><span>{fmt(t.overlapPercent, { percent: Math.round((overlap / chunkSize) * 100) })}</span></div></div>
             <button className="advanced-toggle" onClick={() => setShowAdvanced((value) => !value)} aria-expanded={showAdvanced}><Settings2 size={16} /> {t.advancedToggle} <ChevronDown size={15} className={showAdvanced ? "rotated" : ""} /></button>
-            {showAdvanced && <div className="advanced-content"><label className="field-label" htmlFor="context-limit">{t.contextLimitLabel}</label><div className="limit-input"><input id="context-limit" type="number" min="128" value={contextLimit} onChange={(event) => setContextLimit(Number(event.target.value) || 128)} /><span>{t.tokensSuffix}</span></div><p>{t.contextLimitNote}</p></div>}
+            {showAdvanced && <div className="advanced-content"><label className="field-label" htmlFor="context-limit">{t.contextLimitLabel}</label><div className="limit-input"><input id="context-limit" type="number" inputMode="numeric" min="128" value={contextLimit} onChange={(event) => setContextLimit(Number(event.target.value) || 128)} /><span>{t.tokensSuffix}</span></div><p>{t.contextLimitNote}</p></div>}
           </div>
         </aside>
       </section>
@@ -646,6 +657,7 @@ export default function App() {
                 <div className="rate-input manual-tokens">
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="0"
                     step="100"
                     value={manualTokens}
@@ -724,7 +736,7 @@ export default function App() {
             </div>
             <div className="pricing-field">
               <label className="field-label" htmlFor="usd-brl">{t.priceRateLabel}</label>
-              <div className="rate-input"><span>R$</span><input id="usd-brl" type="number" min="0" step="0.01" value={usdBrl} onChange={(event) => changeRate(Number(event.target.value) || 0)} /></div>
+              <div className="rate-input"><span>R$</span><input id="usd-brl" type="number" inputMode="decimal" min="0" step="0.01" value={usdBrl} onChange={(event) => changeRate(Number(event.target.value) || 0)} /></div>
               <small className="pricing-hint">{t.priceRateNote}</small>
             </div>
           </div>
@@ -826,14 +838,14 @@ export default function App() {
         </div>
         <div className="metric-grid">
           <article className="metric primary-metric"><span>{t.metricInputTokens}</span><strong>{num(analysis.totalTokens)}</strong><small>{t.metricInputTokensSub}</small></article>
-          <article className="metric accent-metric"><span>{t.metricAvgInput} <span className="hint" title={t.metricAvgInputHint}><Info size={13} /></span></span><strong>{num(analysis.avgInput)}</strong><small>{analysis.rows.length} {analysis.rows.length === 1 ? t.metricAvgInputSubOne : t.metricAvgInputSubMany}</small></article>
+          <article className="metric accent-metric"><span>{t.metricAvgInput} <HintTip label={t.metricAvgInputHint}><Info size={13} /></HintTip></span><strong>{num(analysis.avgInput)}</strong><small>{analysis.rows.length} {analysis.rows.length === 1 ? t.metricAvgInputSubOne : t.metricAvgInputSubMany}</small></article>
           <article className="metric"><span>{t.metricChunks}</span><strong>{num(analysis.totalChunks)}</strong><small>{fmt(t.metricChunksSub, { avg: num(analysis.avgChunk) })}</small></article>
           <article className="metric"><span>{t.metricRequests}</span><strong>{num(analysis.requests)}</strong><small>{fmt(t.metricRequestsSub, { batch: num(batchSize) })}</small></article>
         </div>
         <div className="result-detail-grid">
           <article className="distribution-panel">
             <div className="panel-title-row"><div><h3>{t.distributionTitle}</h3><p>{t.distributionSubtitle}</p></div><div className="mini-tabs"><button className={activeMetric === "tokens" ? "active" : ""} onClick={() => setActiveMetric("tokens")}>{t.distTabTokens}</button><button className={activeMetric === "chunks" ? "active" : ""} onClick={() => setActiveMetric("chunks")}>{t.distTabChunks}</button></div></div>
-            <div className="bars">{analysis.rows.length ? analysis.rows.map((row, index) => { const value = activeMetric === "tokens" ? row.tokens : row.chunks; return <div className="bar-row" key={row.id}><span className="bar-label" title={row.name}>{row.name}</span><div className="bar-track"><span style={{ width: `${Math.max(3, (value / maxBar) * 100)}%`, animationDelay: `${index * 70}ms` }} /></div><strong>{num(value)}</strong></div>; }) : <div className="empty-chart"><BarChart3 size={28} /><span>{t.emptyChart}</span></div>}</div>
+            <div className="bars">{analysis.rows.length ? analysis.rows.map((row, index) => { const value = activeMetric === "tokens" ? row.tokens : row.chunks; return <div className="bar-row" key={row.id} data-tooltip={row.name}><span className="bar-label">{row.name}</span><div className="bar-track"><span style={{ width: `${Math.max(3, (value / maxBar) * 100)}%`, animationDelay: `${index * 70}ms` }} /></div><strong>{num(value)}</strong></div>; }) : <div className="empty-chart"><BarChart3 size={28} /><span>{t.emptyChart}</span></div>}</div>
           </article>
           <article className="insight-panel"><span className="insight-icon"><Sparkles size={19} /></span><h3>{t.insightTitle}</h3>{analysis.rows.length ? <p>{fmt(t.insightBody, { chunkSize, overlap: num(overlap), embedded: num(analysis.embeddedTokens) })}</p> : <p>{t.insightEmpty}</p>}<div className="insight-stat"><span>{t.insightOverheadLabel}</span><strong>+{num(analysis.overhead)}</strong></div><div className="insight-stat"><span>{t.insightMaxChunkLabel}</span><strong>{num(analysis.maxChunk)}</strong></div><small className="method-note">{t.methodNote}</small></article>
         </div>
@@ -962,7 +974,7 @@ export default function App() {
         <span>{t.footerFilesNote}</span>
       </footer>
 
-      <a className="coffee-fab" href={COFFEE_URL} target="_blank" rel="noopener noreferrer" aria-label={t.coffeeLabel} title={t.coffeeLabel}>
+      <a className="coffee-fab" href={COFFEE_URL} target="_blank" rel="noopener noreferrer" aria-label={t.coffeeLabel}>
         <span className="coffee-fab-icon"><Coffee size={22} /></span>
         <span className="coffee-fab-text">{t.coffeeLabel}</span>
       </a>
