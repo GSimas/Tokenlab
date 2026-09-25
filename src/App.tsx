@@ -42,13 +42,49 @@ type ModelPreset = {
   tokenizer: "cl100k" | "estimate";
 };
 
+// Limites de entrada por texto conforme a documentação de cada provedor.
+// Agrupados por provedor — a ordem aqui é a ordem dos <optgroup> no seletor.
 const MODELS: ModelPreset[] = [
   { id: "text-embedding-3-small", provider: "OpenAI", name: "text-embedding-3-small", limit: 8191, tokenizer: "cl100k" },
   { id: "text-embedding-3-large", provider: "OpenAI", name: "text-embedding-3-large", limit: 8191, tokenizer: "cl100k" },
+  { id: "text-embedding-ada-002", provider: "OpenAI", name: "text-embedding-ada-002", limit: 8191, tokenizer: "cl100k" },
+  { id: "gemini-embedding-2", provider: "Google", name: "gemini-embedding-2", limit: 8192, tokenizer: "estimate" },
   { id: "gemini-embedding-001", provider: "Google", name: "gemini-embedding-001", limit: 2048, tokenizer: "estimate" },
+  { id: "voyage-4-large", provider: "Voyage AI", name: "voyage-4-large", limit: 32000, tokenizer: "estimate" },
+  { id: "voyage-4", provider: "Voyage AI", name: "voyage-4", limit: 32000, tokenizer: "estimate" },
+  { id: "voyage-4-lite", provider: "Voyage AI", name: "voyage-4-lite", limit: 32000, tokenizer: "estimate" },
+  { id: "voyage-code-4", provider: "Voyage AI", name: "voyage-code-4", limit: 32000, tokenizer: "estimate" },
+  { id: "voyage-context-4", provider: "Voyage AI", name: "voyage-context-4", limit: 32000, tokenizer: "estimate" },
+  { id: "voyage-finance-2", provider: "Voyage AI", name: "voyage-finance-2", limit: 32000, tokenizer: "estimate" },
+  { id: "voyage-law-2", provider: "Voyage AI", name: "voyage-law-2", limit: 16000, tokenizer: "estimate" },
   { id: "cohere-embed-v4", provider: "Cohere", name: "embed-v4.0", limit: 128000, tokenizer: "estimate" },
+  { id: "cohere-embed-multilingual-v3", provider: "Cohere", name: "embed-multilingual-v3.0", limit: 512, tokenizer: "estimate" },
+  { id: "cohere-embed-english-v3", provider: "Cohere", name: "embed-english-v3.0", limit: 512, tokenizer: "estimate" },
+  { id: "jina-embeddings-v5-text-small", provider: "Jina AI", name: "jina-embeddings-v5-text-small", limit: 32768, tokenizer: "estimate" },
+  { id: "jina-embeddings-v5-text-nano", provider: "Jina AI", name: "jina-embeddings-v5-text-nano", limit: 8192, tokenizer: "estimate" },
+  { id: "jina-embeddings-v4", provider: "Jina AI", name: "jina-embeddings-v4", limit: 32768, tokenizer: "estimate" },
+  { id: "jina-embeddings-v3", provider: "Jina AI", name: "jina-embeddings-v3", limit: 8192, tokenizer: "estimate" },
+  { id: "jina-code-embeddings-1.5b", provider: "Jina AI", name: "jina-code-embeddings-1.5b", limit: 32768, tokenizer: "estimate" },
+  { id: "mistral-embed", provider: "Mistral", name: "mistral-embed", limit: 8192, tokenizer: "estimate" },
+  { id: "codestral-embed", provider: "Mistral", name: "codestral-embed", limit: 8000, tokenizer: "estimate" },
+  { id: "titan-embed-text-v2", provider: "Amazon", name: "titan-embed-text-v2", limit: 8192, tokenizer: "estimate" },
+  { id: "nova-2-multimodal-embeddings", provider: "Amazon", name: "nova-2-multimodal-embeddings", limit: 8000, tokenizer: "estimate" },
+  { id: "text-embedding-v4", provider: "Alibaba", name: "text-embedding-v4", limit: 8192, tokenizer: "estimate" },
+  { id: "pplx-embed-v1-4b", provider: "Perplexity", name: "pplx-embed-v1-4b", limit: 32000, tokenizer: "estimate" },
+  { id: "pplx-embed-v1-0.6b", provider: "Perplexity", name: "pplx-embed-v1-0.6b", limit: 32000, tokenizer: "estimate" },
+  { id: "pplx-embed-context-v1-4b", provider: "Perplexity", name: "pplx-embed-context-v1-4b", limit: 32000, tokenizer: "estimate" },
+  { id: "granite-embedding-278m", provider: "IBM", name: "granite-embedding-278m-multilingual", limit: 512, tokenizer: "estimate" },
   { id: "generic", provider: "", name: "", limit: 8192, tokenizer: "estimate" },
 ];
+
+// Sequências consecutivas do mesmo provedor viram um <optgroup>; o genérico
+// (sem provedor) fica solto no fim da lista.
+const MODEL_GROUPS = MODELS.reduce<{ provider: string; models: ModelPreset[] }[]>((groups, model) => {
+  const last = groups[groups.length - 1];
+  if (last && last.provider === model.provider) last.models.push(model);
+  else groups.push({ provider: model.provider, models: [model] });
+  return groups;
+}, []);
 
 const SAMPLE_PT = `# Política de atendimento ao cliente
 
@@ -219,7 +255,7 @@ export default function App() {
   const [priceDirection, setPriceDirection] = useState<"input" | "output">("input");
   const [tokenSource, setTokenSource] = useState<"content" | "manual">("content");
   const [manualTokens, setManualTokens] = useState(1000);
-  const [priceModelId, setPriceModelId] = useState("openai/gpt-5.1");
+  const [priceModelId, setPriceModelId] = useState("openai/gpt-6-sol");
   const [usdBrl, setUsdBrl] = useState(DEFAULT_USD_BRL);
   const [priceProviders, setPriceProviders] = useState<string[]>(PROVIDERS);
   const [hoveredPrice, setHoveredPrice] = useState<{ row: ComparisonRow; x: number; y: number } | null>(null);
@@ -580,7 +616,9 @@ export default function App() {
           <div className="section-heading"><span className="step-number">02</span><div><h2>{t.step2Title}</h2><p>{t.step2Subtitle}</p></div></div>
           <div className="config-panel">
             <label className="field-label" htmlFor="model">{t.modelLabel}</label>
-            <div className="select-wrap"><select id="model" value={modelId} onChange={(event) => changeModel(event.target.value)}>{MODELS.map((item) => <option value={item.id} key={item.id}>{item.provider ? `${item.provider} · ` : ""}{item.name || modelDetail(item.id, locale)}</option>)}</select><ChevronDown size={17} /></div>
+            <div className="select-wrap"><select id="model" value={modelId} onChange={(event) => changeModel(event.target.value)}>{MODEL_GROUPS.map((group) => group.provider
+              ? <optgroup label={group.provider} key={group.provider}>{group.models.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</optgroup>
+              : group.models.map((item) => <option value={item.id} key={item.id}>{modelDetail(item.id, locale)}</option>))}</select><ChevronDown size={17} /></div>
             <div className="model-meta"><span><Sparkles size={14} /> {modelDetail(model.id, locale)}</span><span>{model.tokenizer === "cl100k" ? t.tokenizerExact : t.tokenizerEstimate}</span></div>
             <div className="field-grid">
               <div><label className="field-label" htmlFor="strategy">{t.splitLabel}</label><div className="select-wrap compact"><select id="strategy" value={strategy} onChange={(event) => setStrategy(event.target.value)}><option value="recursive">{t.splitRecursive}</option><option value="paragraph">{t.splitParagraph}</option><option value="markdown">{t.splitMarkdown}</option></select><ChevronDown size={16} /></div></div>
